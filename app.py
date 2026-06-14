@@ -26,7 +26,7 @@ def get_yt_dlp_base_opts():
     opts = {
         "quiet": True,
         "no_warnings": True,
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
     yt_cookies = os.environ.get("YT_COOKIES", "")
     if yt_cookies:
