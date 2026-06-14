@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcritor — Agência Mesh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── RESET & BASE ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0A0A0A;
+    --surface:   #141414;
+    --surface2:  #1C1C1C;
+    --border:    #2A2A2A;
+    --accent:    #00C896;
+    --accent-dim:#00C89620;
+    --text:      #F0F0F0;
+    --muted:     #666;
+    --error:     #FF4D4D;
+    --radius:    12px;
+    --font:      'Inter', system-ui, sans-serif;
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── LAYOUT ── */
+  .app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px 80px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    width: 100%;
+    max-width: 680px;
+    margin-bottom: 48px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-mark {
+    width: 38px;
+    height: 38px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-mark svg { display: block; }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .logo-text span:first-child {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .logo-text span:last-child {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* ── CARD ── */
+  .card {
+    width: 100%;
+    max-width: 680px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 16px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+  }
+
+  .tab::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transition: transform 0.2s;
+  }
+
+  .tab.active {
+    color: var(--text);
+    background: var(--accent-dim);
+  }
+
+  .tab.active::after { transform: scaleX(1); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* ── PANELS ── */
+  .panel {
+    padding: 28px;
+    display: none;
+  }
+
+  .panel.active { display: block; }
+
+  /* ── URL INPUT ── */
+  .url-group {
+    display: flex;
+    gap: 10px;
+  }
+
+  .url-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 13px 16px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .url-input::placeholder { color: var(--muted); }
+  .url-input:focus { border-color: var(--accent); }
+
+  /* ── UPLOAD AREA ── */
+  .upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 48px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .upload-area:hover,
+  .upload-area.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .upload-area input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--surface2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+
+  .upload-area h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .upload-area p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .upload-area .file-selected {
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 500;
+    margin-top: 10px;
+    display: none;
+  }
+
+  /* ── BUTTON ── */
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 13px 24px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn:hover { opacity: 0.88; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-full {
+    width: 100%;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  /* ── HINT PLATFORMS ── */
+  .platforms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .platform-tag {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── PROGRESS ── */
+  #progress-section {
+    display: none;
+    padding: 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  #progress-section.visible { display: block; }
+
+  .progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .progress-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-pct {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-bar-track {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .progress-steps {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .step {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+
+  .step.done { background: var(--accent); }
+  .step.active { background: var(--accent); opacity: 0.4; }
+
+  /* ── RESULT ── */
+  #result-section {
+    display: none;
+    padding: 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  #result-section.visible { display: block; }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .result-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-icon {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .btn-icon:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .btn-icon.copied {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .result-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .result-box::-webkit-scrollbar { width: 5px; }
+  .result-box::-webkit-scrollbar-track { background: transparent; }
+  .result-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  .result-meta {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ── ERROR ── */
+  .error-box {
+    background: #1a0a0a;
+    border: 1px solid var(--error);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 13px;
+    color: var(--error);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .footer a { color: var(--accent); text-decoration: none; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 500px) {
+    .url-group { flex-direction: column; }
+    .btn { width: 100%; justify-content: center; }
+    .result-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-mark">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M3 10L8 5L13 10L8 15L3 10Z" fill="#000"/>
+        <path d="M10 10L15 5L20 10L15 15L10 10Z" fill="#000" opacity="0.4"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <span>Agência Mesh</span>
+      <span>Transcritor de Vídeo</span>
+    </div>
+  </header>
+
+  <!-- CARD PRINCIPAL -->
+  <div class="card">
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('url', this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+        </svg>
+        Link / URL
+      </button>
+      <button class="tab" onclick="switchTab('file', this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Upload de Arquivo
+      </button>
+    </div>
+
+    <!-- PANEL URL -->
+    <div class="panel active" id="panel-url">
+      <div class="url-group">
+        <input
+          class="url-input"
+          id="url-input"
+          type="url"
+          placeholder="Cole o link do vídeo aqui..."
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button class="btn" onclick="startUrl()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Transcrever
+        </button>
+      </div>
+      <div class="platforms">
+        <span class="platform-tag">▶ YouTube</span>
+        <span class="platform-tag">📸 Instagram</span>
+        <span class="platform-tag">🎵 TikTok</span>
+        <span class="platform-tag">🎬 Link direto (.mp4)</span>
+        <span class="platform-tag">+ outros</span>
+      </div>
+    </div>
+
+    <!-- PANEL UPLOAD -->
+    <div class="panel" id="panel-file">
+      <div class="upload-area" id="upload-area">
+        <input type="file" accept=".mp4,.mov,.avi,.mkv,.webm,.m4v" id="file-input" onchange="onFileSelected(this)">
+        <div class="upload-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00C896" stroke-width="2" stroke-linecap="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h3>Arraste o arquivo aqui</h3>
+        <p>ou clique para selecionar</p>
+        <p style="margin-top:8px">MP4, MOV, AVI, MKV, WEBM — até 200MB</p>
+        <div class="file-selected" id="file-name">✓ arquivo selecionado</div>
+      </div>
+      <button class="btn btn-full" id="upload-btn" onclick="startUpload()" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Transcrever Arquivo
+      </button>
+    </div>
+
+    <!-- PROGRESSO -->
+    <div id="progress-section">
+      <div class="progress-header">
+        <div class="progress-label">
+          <div class="spinner" id="spinner"></div>
+          <span id="progress-msg">Iniciando...</span>
+        </div>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-bar"></div>
+      </div>
+      <div class="progress-steps">
+        <div class="step" id="step-1"></div>
+        <div class="step" id="step-2"></div>
+        <div class="step" id="step-3"></div>
+        <div class="step" id="step-4"></div>
+        <div class="step" id="step-5"></div>
+      </div>
+    </div>
+
+    <!-- RESULTADO -->
+    <div id="result-section">
+      <div class="result-header">
+        <div class="result-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Transcrição concluída
+        </div>
+        <div class="result-actions">
+          <button class="btn-icon" id="copy-btn" onclick="copyText()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copiar
+          </button>
+          <button class="btn-icon" onclick="downloadText()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Baixar .txt
+          </button>
+          <button class="btn-icon" onclick="resetAll()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Nova
+          </button>
+        </div>
+      </div>
+      <div class="result-box" id="result-text"></div>
+      <div class="result-meta" id="result-meta"></div>
+    </div>
+
+  </div><!-- /card -->
+
+  <div class="footer">
+    Powered by <a href="https://agenciamesh.com.br" target="_blank">Agência Mesh</a> · Groq Whisper Large v3
+  </div>
+
+</div><!-- /app -->
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────────────────
+  // Troque pela URL do seu servidor backend (KingHost VPS ou Railway)
+  const API_BASE = "https://SEU-BACKEND-AQUI.com";
+
+  let pollInterval = null;
+  let currentJobId = null;
+  let transcriptionText = "";
+
+  // ── TABS ────────────────────────────────────────────────────────────────────
+  function switchTab(tab, el) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    el.classList.add("active");
+    document.getElementById("panel-" + tab).classList.add("active");
+    resetProgress();
+  }
+
+  // ── FILE UPLOAD ─────────────────────────────────────────────────────────────
+  function onFileSelected(input) {
+    if (input.files.length > 0) {
+      const name = input.files[0].name;
+      document.getElementById("file-name").textContent = "✓ " + name;
+      document.getElementById("file-name").style.display = "block";
+      document.getElementById("upload-btn").disabled = false;
+    }
+  }
+
+  const uploadArea = document.getElementById("upload-area");
+  uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("drag-over"); });
+  uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag-over"));
+  uploadArea.addEventListener("drop", e => {
+    e.preventDefault();
+    uploadArea.classList.remove("drag-over");
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const input = document.getElementById("file-input");
+      const dt = new DataTransfer();
+      dt.items.add(files[0]);
+      input.files = dt.files;
+      onFileSelected(input);
+    }
+  });
+
+  // ── START TRANSCRIPTION ─────────────────────────────────────────────────────
+  async function startUrl() {
+    const url = document.getElementById("url-input").value.trim();
+    if (!url) { alert("Cole uma URL válida."); return; }
+
+    showProgress();
+    try {
+      const res = await fetch(`${API_BASE}/api/transcribe/url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      startPolling(data.job_id);
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  async function startUpload() {
+    const input = document.getElementById("file-input");
+    if (!input.files.length) return;
+
+    const file = input.files[0];
+    const maxBytes = 200 * 1024 * 1024;
+    if (file.size > maxBytes) { alert("Arquivo muito grande. Máximo 200MB."); return; }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    showProgress();
+    try {
+      const res = await fetch(`${API_BASE}/api/transcribe/file`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      startPolling(data.job_id);
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  // ── POLLING ─────────────────────────────────────────────────────────────────
+  function startPolling(jobId) {
+    currentJobId = jobId;
+    pollInterval = setInterval(() => checkStatus(jobId), 1500);
+  }
+
+  async function checkStatus(jobId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/status/${jobId}`);
+      const data = await res.json();
+
+      updateProgress(data.progress, data.message);
+
+      if (data.status === "done") {
+        clearInterval(pollInterval);
+        showResult(data.result);
+      } else if (data.status === "error") {
+        clearInterval(pollInterval);
+        showError(data.error || "Erro desconhecido.");
+      }
+    } catch (err) {
+      clearInterval(pollInterval);
+      showError("Erro de conexão com o servidor.");
+    }
+  }
+
+  // ── UI: PROGRESS ─────────────────────────────────────────────────────────────
+  function showProgress() {
+    resetResult();
+    document.getElementById("progress-section").classList.add("visible");
+    updateProgress(5, "Iniciando...");
+  }
+
+  function updateProgress(pct, msg) {
+    document.getElementById("progress-bar").style.width = pct + "%";
+    document.getElementById("progress-pct").textContent = pct + "%";
+    document.getElementById("progress-msg").textContent = msg;
+
+    // Steps visuais
+    const thresholds = [20, 40, 60, 80, 100];
+    thresholds.forEach((t, i) => {
+      const step = document.getElementById("step-" + (i + 1));
+      if (pct >= t) step.className = "step done";
+      else if (pct >= (thresholds[i - 1] || 0)) step.className = "step active";
+      else step.className = "step";
+    });
+  }
+
+  function resetProgress() {
+    document.getElementById("progress-section").classList.remove("visible");
+    updateProgress(0, "");
+    if (pollInterval) clearInterval(pollInterval);
+  }
+
+  // ── UI: RESULT ───────────────────────────────────────────────────────────────
+  function showResult(text) {
+    transcriptionText = text;
+    document.getElementById("spinner").style.display = "none";
+    updateProgress(100, "Concluído ✓");
+
+    const words = text.trim().split(/\s+/).length;
+    const chars = text.length;
+
+    document.getElementById("result-text").textContent = text;
+    document.getElementById("result-meta").textContent =
+      `${words.toLocaleString("pt-BR")} palavras · ${chars.toLocaleString("pt-BR")} caracteres`;
+
+    document.getElementById("result-section").classList.add("visible");
+  }
+
+  function resetResult() {
+    document.getElementById("result-section").classList.remove("visible");
+    document.getElementById("result-text").textContent = "";
+    document.getElementById("result-meta").textContent = "";
+    document.getElementById("spinner").style.display = "block";
+    transcriptionText = "";
+  }
+
+  function showError(msg) {
+    document.getElementById("progress-section").classList.remove("visible");
+    const resultSection = document.getElementById("result-section");
+    resultSection.classList.add("visible");
+    document.getElementById("result-text").innerHTML =
+      `<div class="error-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>${msg}</span>
+      </div>`;
+    document.getElementById("result-meta").textContent = "";
+
+    // oculta botões de copiar/baixar no erro
+    document.getElementById("copy-btn").style.display = "none";
+    document.querySelector(".result-actions .btn-icon:nth-child(2)").style.display = "none";
+  }
+
+  // ── COPIAR / BAIXAR ──────────────────────────────────────────────────────────
+  function copyText() {
+    if (!transcriptionText) return;
+    navigator.clipboard.writeText(transcriptionText).then(() => {
+      const btn = document.getElementById("copy-btn");
+      btn.classList.add("copied");
+      btn.querySelector("svg").style.display = "none";
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Copiado!`;
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copiar`;
+      }, 2500);
+    });
+  }
+
+  function downloadText() {
+    if (!transcriptionText) return;
+    const blob = new Blob([transcriptionText], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "transcricao-mesh-" + new Date().toISOString().slice(0,10) + ".txt";
+    a.click();
+  }
+
+  function resetAll() {
+    resetProgress();
+    resetResult();
+    document.getElementById("copy-btn").style.display = "";
+    document.querySelector(".result-actions .btn-icon:nth-child(2)").style.display = "";
+    document.getElementById("url-input").value = "";
+    document.getElementById("file-input").value = "";
+    document.getElementById("file-name").style.display = "none";
+    document.getElementById("upload-btn").disabled = true;
+  }
+</script>
+</body>
+</html>
