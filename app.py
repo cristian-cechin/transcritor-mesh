@@ -329,10 +329,10 @@ def download_video():
             ext = "mp3"
             mime = "audio/mpeg"
         else:
-            height = quality  # "1080", "720", "480"
+            height = quality
             ydl_opts = {
                 **get_yt_dlp_base_opts(),
-                "format": f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best[height<={height}]",
+                "format": f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/bestvideo+bestaudio/best",
                 "outtmpl": output_base + ".%(ext)s",
                 "merge_output_format": "mp4",
             }
