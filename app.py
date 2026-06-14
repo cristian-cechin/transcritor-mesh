@@ -404,7 +404,8 @@ def download_video():
 def health():
     deno = subprocess.run(["which", "deno"], capture_output=True, text=True)
     deno_ver = subprocess.run(["deno", "--version"], capture_output=True, text=True)
-    return jsonify({"status": "ok", "deno_path": deno.stdout.strip(), "deno_version": deno_ver.stdout.strip()[:50]})
+    ytdlp_ver = subprocess.run(["python3", "-c", "import yt_dlp; print(yt_dlp.version.__version__)"], capture_output=True, text=True)
+    return jsonify({"status": "ok", "deno_path": deno.stdout.strip(), "deno_version": deno_ver.stdout.strip()[:50], "ytdlp": ytdlp_ver.stdout.strip()})
 
 
 if __name__ == "__main__":
