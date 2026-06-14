@@ -45,12 +45,27 @@ def try_youtube_transcript(url, job_id):
     update_job(job_id, progress=20, message="Buscando transcrição do YouTube...")
 
     try:
-        # Tenta português primeiro, depois qualquer idioma
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+
+        # Tenta: pt manual → pt gerado → qualquer manual → qualquer gerado
+        transcript = None
         try:
             transcript = transcript_list.find_transcript(["pt", "pt-BR", "pt-PT"])
         except Exception:
-            transcript = transcript_list.find_generated_transcript(["pt", "pt-BR", "en"])
+            pass
+        if not transcript:
+            try:
+                transcript = transcript_list.find_generated_transcript(["pt", "pt-BR", "pt-PT"])
+            except Exception:
+                pass
+        if not transcript:
+            # Pega qualquer transcrição disponível
+            all_transcripts = list(transcript_list)
+            if all_transcripts:
+                transcript = all_transcripts[0]
+
+        if not transcript:
+            return None
 
         update_job(job_id, progress=70, message="Processando transcrição...")
         entries = transcript.fetch()
@@ -66,14 +81,10 @@ def try_youtube_transcript(url, job_id):
 def extract_audio_from_url(url, output_path, job_id):
     update_job(job_id, progress=15, message="Identificando fonte do vídeo...")
 
+    # Baixa o vídeo/áudio sem pós-processamento para evitar problemas de codec
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": output_path + ".%(ext)s",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "128",
-        }],
         "quiet": True,
         "no_warnings": True,
     }
@@ -81,18 +92,34 @@ def extract_audio_from_url(url, output_path, job_id):
     update_job(job_id, progress=25, message="Baixando áudio do vídeo...")
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        info = ydl.extract_info(url, download=True)
+        downloaded_ext = info.get("ext", "mp4")
 
-    audio_file = output_path + ".mp3"
-    if not os.path.exists(audio_file):
-        for ext in ["mp3", "m4a", "webm", "ogg", "wav"]:
+    # Encontrar arquivo baixado
+    downloaded_file = output_path + "." + downloaded_ext
+    if not os.path.exists(downloaded_file):
+        for ext in ["mp4", "webm", "m4a", "mp3", "ogg", "wav"]:
             candidate = output_path + "." + ext
             if os.path.exists(candidate):
-                audio_file = candidate
+                downloaded_file = candidate
                 break
 
+    if not os.path.exists(downloaded_file):
+        raise FileNotFoundError("Não foi possível baixar o vídeo.")
+
+    # Converter para mp3 via ffmpeg
+    audio_file = output_path + ".mp3"
+    result = subprocess.run([
+        "ffmpeg", "-i", downloaded_file,
+        "-vn", "-ar", "16000", "-ac", "1", "-b:a", "128k",
+        audio_file, "-y"
+    ], capture_output=True, text=True)
+
+    if downloaded_file != audio_file and os.path.exists(downloaded_file):
+        os.remove(downloaded_file)
+
     if not os.path.exists(audio_file):
-        raise FileNotFoundError("Não foi possível extrair o áudio do vídeo.")
+        raise RuntimeError(f"Erro ao converter áudio: {result.stderr[-300:]}")
 
     return audio_file
 
