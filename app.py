@@ -41,6 +41,10 @@ def extract_audio_from_url(url, output_path, job_id):
         }],
         "quiet": True,
         "no_warnings": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
+        },
     }
 
     update_job(job_id, progress=25, message="Baixando áudio do vídeo...")
