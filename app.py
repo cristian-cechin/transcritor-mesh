@@ -92,7 +92,7 @@ def try_youtube_transcript(url, job_id):
             return None
 
         update_job(job_id, progress=70, message="Processando transcrição...")
-        entries = transcript.fetch(**kwargs)
+        entries = transcript.fetch()
         text = " ".join(e["text"] for e in entries)
         return text.strip()
 
