@@ -61,7 +61,15 @@ def try_youtube_transcript(url, job_id):
     update_job(job_id, progress=20, message="Buscando transcrição do YouTube...")
 
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        # Passa cookies se disponíveis
+        kwargs = {}
+        yt_cookies = os.environ.get("YT_COOKIES", "")
+        if yt_cookies:
+            with open(COOKIES_FILE, "w") as f:
+                f.write(yt_cookies)
+            kwargs["cookies"] = COOKIES_FILE
+
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, **kwargs)
 
         # Tenta: pt manual → pt gerado → qualquer manual → qualquer gerado
         transcript = None
@@ -84,7 +92,7 @@ def try_youtube_transcript(url, job_id):
             return None
 
         update_job(job_id, progress=70, message="Processando transcrição...")
-        entries = transcript.fetch()
+        entries = transcript.fetch(**kwargs)
         text = " ".join(e["text"] for e in entries)
         return text.strip()
 
