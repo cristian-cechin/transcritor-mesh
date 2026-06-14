@@ -96,7 +96,7 @@ def extract_audio_from_url(url, output_path, job_id):
     # Baixa o vídeo/áudio sem pós-processamento para evitar problemas de codec
     ydl_opts = {
         **get_yt_dlp_base_opts(),
-        "format": "bestaudio/best",
+        "format": "bestaudio/best/worstaudio/worst",
         "outtmpl": output_path + ".%(ext)s",
     }
 
