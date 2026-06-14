@@ -1,12 +1,13 @@
 import os
+import re
 import uuid
-import tempfile
 import subprocess
 import threading
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from groq import Groq
 import yt_dlp
+from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
 
 app = Flask(__name__)
 CORS(app)
@@ -18,17 +19,51 @@ client = Groq(api_key=GROQ_API_KEY)
 UPLOAD_FOLDER = "/tmp/transcritor"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-MAX_FILE_MB = 200  # limite de upload
-
 # ─── JOB STATUS ───────────────────────────────────────────────────────────────
-jobs = {}  # job_id -> { status, progress, message, result, error }
+jobs = {}
 
 def update_job(job_id, **kwargs):
     jobs[job_id].update(kwargs)
 
-# ─── EXTRAÇÃO DE ÁUDIO ────────────────────────────────────────────────────────
+# ─── YOUTUBE: TRANSCRIÇÃO DIRETA VIA API ──────────────────────────────────────
+def extract_youtube_id(url):
+    patterns = [
+        r"(?:v=|youtu\.be/|/embed/|/shorts/)([a-zA-Z0-9_-]{11})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def try_youtube_transcript(url, job_id):
+    """Tenta buscar transcrição direto do YouTube. Retorna texto ou None."""
+    video_id = extract_youtube_id(url)
+    if not video_id:
+        return None
+
+    update_job(job_id, progress=20, message="Buscando transcrição do YouTube...")
+
+    try:
+        # Tenta português primeiro, depois qualquer idioma
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        try:
+            transcript = transcript_list.find_transcript(["pt", "pt-BR", "pt-PT"])
+        except Exception:
+            transcript = transcript_list.find_generated_transcript(["pt", "pt-BR", "en"])
+
+        update_job(job_id, progress=70, message="Processando transcrição...")
+        entries = transcript.fetch()
+        text = " ".join(e["text"] for e in entries)
+        return text.strip()
+
+    except (NoTranscriptFound, TranscriptsDisabled):
+        return None
+    except Exception:
+        return None
+
+# ─── EXTRAÇÃO DE ÁUDIO VIA YT-DLP ────────────────────────────────────────────
 def extract_audio_from_url(url, output_path, job_id):
-    """Baixa e extrai áudio de YouTube, Instagram, TikTok, link direto, etc."""
     update_job(job_id, progress=15, message="Identificando fonte do vídeo...")
 
     ydl_opts = {
@@ -41,7 +76,6 @@ def extract_audio_from_url(url, output_path, job_id):
         }],
         "quiet": True,
         "no_warnings": True,
-        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "android", "web"]}},
     }
 
     update_job(job_id, progress=25, message="Baixando áudio do vídeo...")
@@ -51,7 +85,6 @@ def extract_audio_from_url(url, output_path, job_id):
 
     audio_file = output_path + ".mp3"
     if not os.path.exists(audio_file):
-        # tenta encontrar o arquivo com qualquer extensão
         for ext in ["mp3", "m4a", "webm", "ogg", "wav"]:
             candidate = output_path + "." + ext
             if os.path.exists(candidate):
@@ -65,7 +98,6 @@ def extract_audio_from_url(url, output_path, job_id):
 
 
 def extract_audio_from_file(file_path, output_path, job_id):
-    """Extrai áudio de um arquivo de vídeo enviado (mp4, mov, etc.)"""
     update_job(job_id, progress=20, message="Extraindo áudio do vídeo...")
 
     audio_file = output_path + ".mp3"
@@ -82,20 +114,16 @@ def extract_audio_from_file(file_path, output_path, job_id):
 
 
 def split_audio_if_needed(audio_path, job_id):
-    """Divide o áudio em chunks de 24MB se necessário (limite da API Groq)."""
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
-
     if file_size_mb <= 24:
         return [audio_path]
 
     update_job(job_id, progress=40, message="Dividindo áudio em partes...")
 
-    chunk_duration = 600  # 10 minutos por chunk
+    chunk_duration = 600
     chunks = []
-    chunk_dir = os.path.dirname(audio_path)
     base = os.path.splitext(audio_path)[0]
 
-    # descobrir duração total
     result = subprocess.run([
         "ffprobe", "-v", "error", "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1", audio_path
@@ -120,7 +148,6 @@ def split_audio_if_needed(audio_path, job_id):
 
 
 def transcribe_audio(audio_path, job_id, chunk_index=0, total_chunks=1):
-    """Envia áudio para a API Groq Whisper e retorna texto."""
     pct_base = 55 + (chunk_index / total_chunks) * 35
     update_job(job_id, progress=int(pct_base),
                message=f"Transcrevendo{'...' if total_chunks == 1 else f' parte {chunk_index+1} de {total_chunks}...'}")
@@ -137,13 +164,25 @@ def transcribe_audio(audio_path, job_id, chunk_index=0, total_chunks=1):
 
 
 # ─── WORKER THREAD ────────────────────────────────────────────────────────────
+def is_youtube_url(url):
+    return "youtube.com" in url or "youtu.be" in url
+
 def process_job(job_id, source_type, url=None, file_path=None):
     try:
         output_base = os.path.join(UPLOAD_FOLDER, job_id)
-
         update_job(job_id, status="processing", progress=10, message="Iniciando processamento...")
 
-        # 1. Obter áudio
+        if source_type == "url" and is_youtube_url(url):
+            # Tenta transcrição direta do YouTube primeiro
+            text = try_youtube_transcript(url, job_id)
+            if text:
+                update_job(job_id, status="done", progress=100,
+                           message="Transcrição concluída!", result=text)
+                return
+            # Fallback: baixar áudio e usar Groq
+            update_job(job_id, progress=30, message="Sem legenda disponível, baixando áudio...")
+
+        # Para não-YouTube ou fallback
         if source_type == "url":
             audio_path = extract_audio_from_url(url, output_base, job_id)
         else:
@@ -151,19 +190,15 @@ def process_job(job_id, source_type, url=None, file_path=None):
 
         update_job(job_id, progress=45, message="Áudio extraído. Preparando transcrição...")
 
-        # 2. Dividir se necessário
         chunks = split_audio_if_needed(audio_path, job_id)
 
-        # 3. Transcrever
         full_text = ""
         for i, chunk in enumerate(chunks):
             text = transcribe_audio(chunk, job_id, i, len(chunks))
             full_text += text + " "
 
-        # 4. Limpeza
         update_job(job_id, progress=95, message="Finalizando...")
 
-        # Remover arquivos temporários
         for f in [audio_path, file_path] + ([c for c in chunks if c != audio_path]):
             try:
                 if f and os.path.exists(f):
@@ -171,18 +206,11 @@ def process_job(job_id, source_type, url=None, file_path=None):
             except:
                 pass
 
-        update_job(job_id,
-                   status="done",
-                   progress=100,
-                   message="Transcrição concluída!",
-                   result=full_text.strip())
+        update_job(job_id, status="done", progress=100,
+                   message="Transcrição concluída!", result=full_text.strip())
 
     except Exception as e:
-        update_job(job_id,
-                   status="error",
-                   progress=0,
-                   message=str(e),
-                   error=str(e))
+        update_job(job_id, status="error", progress=0, message=str(e), error=str(e))
 
 
 # ─── ROTAS ────────────────────────────────────────────────────────────────────
@@ -190,7 +218,6 @@ def process_job(job_id, source_type, url=None, file_path=None):
 def transcribe_url():
     data = request.get_json()
     url = data.get("url", "").strip()
-
     if not url:
         return jsonify({"error": "URL não informada"}), 400
 
@@ -242,7 +269,6 @@ def health():
     return jsonify({"status": "ok"})
 
 
-# ─── ENTRY POINT ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
