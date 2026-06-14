@@ -207,7 +207,6 @@ def transcribe_audio(audio_path, job_id, chunk_index=0, total_chunks=1):
             file=(os.path.basename(audio_path), audio_file),
             model="whisper-large-v3",
             response_format="text",
-            language="pt",
         )
 
     return transcription
