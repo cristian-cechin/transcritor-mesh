@@ -26,7 +26,6 @@ def get_yt_dlp_base_opts():
     opts = {
         "quiet": True,
         "no_warnings": True,
-        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
     yt_cookies = os.environ.get("YT_COOKIES", "")
     if yt_cookies:
@@ -98,7 +97,8 @@ def try_youtube_transcript(url, job_id):
 
     except (NoTranscriptFound, TranscriptsDisabled):
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[transcript_api] erro: {e}")
         return None
 
 # ─── EXTRAÇÃO DE ÁUDIO VIA YT-DLP ────────────────────────────────────────────
