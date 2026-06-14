@@ -12,6 +12,9 @@ from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, Tran
 app = Flask(__name__)
 CORS(app)
 
+# Garante que deno está no PATH (usado pelo yt-dlp para JS challenges do YouTube)
+os.environ["PATH"] = "/usr/local/bin:" + os.environ.get("PATH", "")
+
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "SUA_CHAVE_GROQ_AQUI")
 client = Groq(api_key=GROQ_API_KEY)
