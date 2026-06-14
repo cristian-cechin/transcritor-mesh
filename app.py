@@ -21,7 +21,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 COOKIES_FILE = "/tmp/yt_cookies.txt"
 
-def get_yt_dlp_base_opts():
+def get_yt_dlp_base_opts(for_youtube=False):
     """Opções base do yt-dlp, com cookies do YouTube se disponíveis."""
     opts = {
         "quiet": True,
@@ -32,6 +32,8 @@ def get_yt_dlp_base_opts():
         with open(COOKIES_FILE, "w") as f:
             f.write(yt_cookies)
         opts["cookiefile"] = COOKIES_FILE
+    if for_youtube:
+        opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
     return opts
 
 # ─── JOB STATUS ───────────────────────────────────────────────────────────────
@@ -105,9 +107,9 @@ def try_youtube_transcript(url, job_id):
 def extract_audio_from_url(url, output_path, job_id):
     update_job(job_id, progress=15, message="Identificando fonte do vídeo...")
 
-    # Baixa o vídeo/áudio sem pós-processamento para evitar problemas de codec
+    is_yt = is_youtube_url(url)
     ydl_opts = {
-        **get_yt_dlp_base_opts(),
+        **get_yt_dlp_base_opts(for_youtube=is_yt),
         "format": "best/bestaudio/worstaudio/worst",
         "outtmpl": output_path + ".%(ext)s",
     }
@@ -332,9 +334,10 @@ def download_video():
     output_base = os.path.join(UPLOAD_FOLDER, job_id)
 
     try:
+        is_yt = is_youtube_url(url)
         if quality == "mp3":
             ydl_opts = {
-                **get_yt_dlp_base_opts(),
+                **get_yt_dlp_base_opts(for_youtube=is_yt),
                 "format": "bestaudio/best",
                 "outtmpl": output_base + ".%(ext)s",
                 "postprocessors": [{
@@ -348,7 +351,7 @@ def download_video():
         else:
             height = quality
             ydl_opts = {
-                **get_yt_dlp_base_opts(),
+                **get_yt_dlp_base_opts(for_youtube=is_yt),
                 "format": f"best[height<={height}]/best",
                 "outtmpl": output_base + ".%(ext)s",
             }
