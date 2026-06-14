@@ -3,7 +3,7 @@ import re
 import uuid
 import subprocess
 import threading
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, after_this_request
 from flask_cors import CORS
 from groq import Groq
 import yt_dlp
@@ -18,6 +18,18 @@ client = Groq(api_key=GROQ_API_KEY)
 
 UPLOAD_FOLDER = "/tmp/transcritor"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+COOKIES_FILE = "/tmp/yt_cookies.txt"
+
+def get_yt_dlp_base_opts():
+    """Opções base do yt-dlp, com cookies do YouTube se disponíveis."""
+    opts = {"quiet": True, "no_warnings": True}
+    yt_cookies = os.environ.get("YT_COOKIES", "")
+    if yt_cookies:
+        with open(COOKIES_FILE, "w") as f:
+            f.write(yt_cookies)
+        opts["cookiefile"] = COOKIES_FILE
+    return opts
 
 # ─── JOB STATUS ───────────────────────────────────────────────────────────────
 jobs = {}
@@ -83,10 +95,9 @@ def extract_audio_from_url(url, output_path, job_id):
 
     # Baixa o vídeo/áudio sem pós-processamento para evitar problemas de codec
     ydl_opts = {
+        **get_yt_dlp_base_opts(),
         "format": "bestaudio/best",
         "outtmpl": output_path + ".%(ext)s",
-        "quiet": True,
-        "no_warnings": True,
     }
 
     update_job(job_id, progress=25, message="Baixando áudio do vídeo...")
@@ -289,6 +300,82 @@ def job_status(job_id):
     if not job:
         return jsonify({"error": "Job não encontrado"}), 404
     return jsonify(job)
+
+
+@app.route("/api/download", methods=["POST"])
+def download_video():
+    data = request.get_json()
+    url = data.get("url", "").strip()
+    quality = data.get("quality", "720")  # "1080", "720", "480", "mp3"
+
+    if not url:
+        return jsonify({"error": "URL não informada"}), 400
+
+    job_id = str(uuid.uuid4())
+    output_base = os.path.join(UPLOAD_FOLDER, job_id)
+
+    try:
+        if quality == "mp3":
+            ydl_opts = {
+                **get_yt_dlp_base_opts(),
+                "format": "bestaudio/best",
+                "outtmpl": output_base + ".%(ext)s",
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+            }
+            ext = "mp3"
+            mime = "audio/mpeg"
+        else:
+            height = quality  # "1080", "720", "480"
+            ydl_opts = {
+                **get_yt_dlp_base_opts(),
+                "format": f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best[height<={height}]",
+                "outtmpl": output_base + ".%(ext)s",
+                "merge_output_format": "mp4",
+            }
+            ext = "mp4"
+            mime = "video/mp4"
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = re.sub(r'[^\w\s-]', '', info.get("title", "video"))[:60].strip()
+
+        # Encontrar arquivo baixado
+        output_file = output_base + "." + ext
+        if not os.path.exists(output_file):
+            for candidate_ext in ["mp4", "mkv", "webm", "mp3", "m4a"]:
+                candidate = output_base + "." + candidate_ext
+                if os.path.exists(candidate):
+                    output_file = candidate
+                    ext = candidate_ext
+                    mime = "video/mp4" if candidate_ext in ["mp4", "mkv", "webm"] else "audio/mpeg"
+                    break
+
+        if not os.path.exists(output_file):
+            return jsonify({"error": "Não foi possível baixar o vídeo."}), 500
+
+        filename = f"{title}.{ext}"
+
+        @after_this_request
+        def cleanup(response):
+            try:
+                os.remove(output_file)
+            except Exception:
+                pass
+            return response
+
+        return send_file(
+            output_file,
+            mimetype=mime,
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/health")
