@@ -402,7 +402,9 @@ def download_video():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    deno = subprocess.run(["which", "deno"], capture_output=True, text=True)
+    deno_ver = subprocess.run(["deno", "--version"], capture_output=True, text=True)
+    return jsonify({"status": "ok", "deno_path": deno.stdout.strip(), "deno_version": deno_ver.stdout.strip()[:50]})
 
 
 if __name__ == "__main__":
