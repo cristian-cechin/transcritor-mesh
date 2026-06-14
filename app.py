@@ -23,7 +23,11 @@ COOKIES_FILE = "/tmp/yt_cookies.txt"
 
 def get_yt_dlp_base_opts():
     """Opções base do yt-dlp, com cookies do YouTube se disponíveis."""
-    opts = {"quiet": True, "no_warnings": True}
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extractor_args": {"youtube": {"player_client": ["tv_embedded", "web"]}},
+    }
     yt_cookies = os.environ.get("YT_COOKIES", "")
     if yt_cookies:
         with open(COOKIES_FILE, "w") as f:
