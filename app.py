@@ -223,6 +223,9 @@ def process_job(job_id, source_type, url=None, file_path=None):
         # Para não-YouTube ou fallback
         if source_type == "url":
             audio_path = extract_audio_from_url(url, output_base, job_id)
+        elif source_type == "audio_file":
+            # Arquivo de áudio enviado direto — manda pro Groq sem converter
+            audio_path = file_path
         else:
             audio_path = extract_audio_from_file(file_path, output_base, job_id)
 
@@ -275,11 +278,13 @@ def transcribe_file():
         return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
     file = request.files["file"]
-    allowed = {"mp4", "mov", "avi", "mkv", "webm", "m4v"}
+    allowed_video = {"mp4", "mov", "avi", "mkv", "webm", "m4v"}
+    allowed_audio = {"mp3", "m4a", "wav", "aac", "ogg", "flac"}
+    allowed = allowed_video | allowed_audio
     ext = file.filename.rsplit(".", 1)[-1].lower()
 
     if ext not in allowed:
-        return jsonify({"error": f"Formato não suportado. Use: {', '.join(allowed)}"}), 400
+        return jsonify({"error": f"Formato não suportado. Use: {', '.join(sorted(allowed))}"}), 400
 
     job_id = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_FOLDER, f"{job_id}_input.{ext}")
@@ -287,7 +292,8 @@ def transcribe_file():
 
     jobs[job_id] = {"status": "queued", "progress": 0, "message": "Na fila...", "result": None, "error": None}
 
-    thread = threading.Thread(target=process_job, args=(job_id, "file"), kwargs={"file_path": file_path})
+    source = "audio_file" if ext in allowed_audio else "file"
+    thread = threading.Thread(target=process_job, args=(job_id, source), kwargs={"file_path": file_path})
     thread.daemon = True
     thread.start()
 
@@ -332,9 +338,8 @@ def download_video():
             height = quality
             ydl_opts = {
                 **get_yt_dlp_base_opts(),
-                "format": f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/bestvideo+bestaudio/best",
+                "format": f"best[height<={height}]/best",
                 "outtmpl": output_base + ".%(ext)s",
-                "merge_output_format": "mp4",
             }
             ext = "mp4"
             mime = "video/mp4"
