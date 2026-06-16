@@ -308,7 +308,9 @@ def transcribe_file():
 
     jobs[job_id] = {"status": "queued", "progress": 0, "message": "Na fila...", "result": None, "error": None}
 
-    source = "audio_file" if ext in allowed_audio else "file"
+    # ogg/opus precisam de conversão ffmpeg antes do Groq
+    direct_audio = {"mp3", "m4a", "wav", "aac", "flac"}
+    source = "audio_file" if ext in direct_audio else "file"
     thread = threading.Thread(target=process_job, args=(job_id, source), kwargs={"file_path": file_path})
     thread.daemon = True
     thread.start()
