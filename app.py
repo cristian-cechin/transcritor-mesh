@@ -295,7 +295,7 @@ def transcribe_file():
 
     file = request.files["file"]
     allowed_video = {"mp4", "mov", "avi", "mkv", "webm", "m4v"}
-    allowed_audio = {"mp3", "m4a", "wav", "aac", "ogg", "flac"}
+    allowed_audio = {"mp3", "m4a", "wav", "aac", "ogg", "opus", "flac"}
     allowed = allowed_video | allowed_audio
     ext = file.filename.rsplit(".", 1)[-1].lower()
 
